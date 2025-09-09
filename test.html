@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Marshee AI Test</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .chat { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 10px; margin: 10px 0; }
+        .message { margin: 5px 0; padding: 5px; }
+        .user { background: #e3f2fd; text-align: right; }
+        .marshee { background: #f5f5f5; }
+        input, select, button { padding: 8px; margin: 5px; }
+        .progress { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Marshee AI Test</h2>
+        
+        <div>
+            API URL: <input type="text" id="apiUrl" value="http://localhost:8000/api/v1/marshee" style="width: 300px;">
+        </div>
+        <div>
+            User ID: <input type="text" id="userId" value="test_user_123">
+        </div>
+        
+        <div class="progress" id="progress" style="display: none;">
+            Stage: <span id="stageInfo"></span>
+        </div>
+        
+        <div class="chat" id="chat">
+            <div class="message marshee">Click Start to begin</div>
+        </div>
+        
+        <div>
+            <input type="text" id="messageInput" placeholder="Type message..." style="width: 200px; display: none;">
+            <select id="dropdown" style="display: none;">
+                <option value="">Choose...</option>
+            </select>
+            <div id="buttons"></div>
+            <button onclick="send()">Send</button>
+            <button onclick="start()">Start</button>
+        </div>
+    </div>
+
+    <script>
+        let currentStage = '';
+        
+        function addMessage(text, type) {
+            const chat = document.getElementById('chat');
+            const div = document.createElement('div');
+            div.className = 'message ' + type;
+            div.textContent = text;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+        
+        function showInput(type, data) {
+            document.getElementById('messageInput').style.display = 'none';
+            document.getElementById('dropdown').style.display = 'none';
+            document.getElementById('buttons').innerHTML = '';
+            
+            if (type === 'text') {
+                document.getElementById('messageInput').style.display = 'inline';
+            } else if (type === 'dropdown' && data.dropdown_options) {
+                const select = document.getElementById('dropdown');
+                select.style.display = 'inline';
+                select.innerHTML = '<option value="">Choose...</option>';
+                data.dropdown_options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    select.appendChild(option);
+                });
+            } else if (data.buttons) {
+                const container = document.getElementById('buttons');
+                data.buttons.forEach(btn => {
+                    const button = document.createElement('button');
+                    button.textContent = btn;
+                    button.onclick = () => selectOption(btn);
+                    container.appendChild(button);
+                });
+            } else {
+                document.getElementById('messageInput').style.display = 'inline';
+            }
+        }
+        
+        function selectOption(value) {
+            addMessage(value, 'user');
+            sendRequest(currentStage, value);
+        }
+        
+        async function start() {
+            await sendRequest('', '');
+        }
+        
+        async function send() {
+            const input = document.getElementById('messageInput');
+            const dropdown = document.getElementById('dropdown');
+            
+            let message = '';
+            if (input.style.display !== 'none') {
+                message = input.value.trim();
+                input.value = '';
+            } else if (dropdown.style.display !== 'none') {
+                message = dropdown.value;
+            }
+            
+            if (!message) return;
+            
+            addMessage(message, 'user');
+            await sendRequest(currentStage, message);
+        }
+        
+        async function sendRequest(stageId, userMessage) {
+            try {
+                const response = await fetch(document.getElementById('apiUrl').value, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firestore_id: document.getElementById('userId').value,
+                        stage_id: stageId,
+                        user_message: userMessage
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addMessage(data.marshee_response, 'marshee');
+                    
+                    if (data.flow_type === 'initial') {
+                        document.getElementById('progress').style.display = 'block';
+                        document.getElementById('stageInfo').textContent = 
+                            `${data.stage_number}/${data.total_stages} - ${data.stage_id}`;
+                        currentStage = data.stage_id;
+                    } else {
+                        document.getElementById('progress').style.display = 'none';
+                        currentStage = '';
+                    }
+                    
+                    if (data.data && data.data.buttons) {
+                        showInput('buttons', data.data);
+                    } else if (data.data && data.data.dropdown_options) {
+                        showInput('dropdown', data.data);
+                    } else {
+                        showInput('text', {});
+                    }
+                } else {
+                    addMessage('Error: ' + (data.detail || 'Unknown error'), 'marshee');
+                }
+            } catch (error) {
+                addMessage('Connection error: ' + error.message, 'marshee');
+            }
+        }
+        
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') send();
+        });
+    </script>
+</body>
+</html>

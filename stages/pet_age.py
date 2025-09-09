@@ -1,8 +1,8 @@
-"""Stage 5: Pet Age"""
+"""Stage 6: Pet Age"""
 
 STAGE_CONFIG = {
     "stage_id": "pet_age",
-    "stage_number": 5,
+    "stage_number": 6,
     "question": "What's your pet's age (in years)?",
     "type": "text",
     "next_stage": "pet_weight",

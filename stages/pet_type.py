@@ -21,6 +21,6 @@ def validate_input(value: str) -> bool:
     """Validate input for this stage"""
     return value.strip().lower() in ["dog", "cat"]
 
-def get_stage_data() -> dict:
+def get_stage_data(user_data: dict = None) -> dict:
     """Get data for this stage (buttons/dropdown options)"""
     return {"buttons": ["dog", "cat"]}
