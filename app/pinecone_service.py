@@ -2,7 +2,9 @@
 """Pinecone service using free sentence-transformers for embeddings"""
 
 import os
+import time
 from typing import Dict, List
+from datetime import datetime
 from pinecone import Pinecone
 import structlog
 

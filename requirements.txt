@@ -9,3 +9,4 @@ structlog==23.2.0
 pinecone==7.3.0
 sentence-transformers==5.1.0
 python-multipart==0.0.6
+redis==6.4.0
