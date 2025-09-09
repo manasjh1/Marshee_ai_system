@@ -2,17 +2,19 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-
+from app.redis_service import redis_service
 from app.database import connect_to_mongo, close_mongo_connection
 from app.pinecone_service import pinecone_service
 from app.models import APIRequest, APIResponse
 from app.handlers import onboarding_handler, conversation_handler
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown"""
     await connect_to_mongo()
     await pinecone_service.initialize()
+    await redis_service.initialize()
     yield
     await close_mongo_connection()
 
@@ -30,6 +32,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.post("/api/v1/marshee", response_model=APIResponse)
 async def marshee_interaction(request: APIRequest):

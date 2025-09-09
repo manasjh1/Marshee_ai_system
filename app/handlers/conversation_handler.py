@@ -1,15 +1,16 @@
-# app/handlers/conversation_handler.py - Updated to handle no data
-"""Handle main conversation with or without Pinecone data"""
+# app/handlers/conversation_handler.py - Updated with Redis integration
+"""Handle main conversation with Redis chat management and Pinecone context"""
 
 from app.models import APIRequest, APIResponse, UserData, ChatMessage
 from app.services import user_service
 from app.pinecone_service import pinecone_service
+from app.redis_service import redis_service
 import structlog
 
 logger = structlog.get_logger()
 
 async def handle_conversation(request: APIRequest, user: UserData) -> APIResponse:
-    """Handle main conversation with Pinecone context"""
+    """Handle main conversation with Redis and Pinecone integration"""
     
     if request.user_message:
         return await process_user_message(request, user)
@@ -17,7 +18,7 @@ async def handle_conversation(request: APIRequest, user: UserData) -> APIRespons
         return await welcome_back_user(user)
 
 async def process_user_message(request: APIRequest, user: UserData) -> APIResponse:
-    """Process user message with or without Pinecone context"""
+    """Process user message with Redis tracking and Pinecone context"""
     
     try:
         # Try to get context from Pinecone
@@ -29,7 +30,22 @@ async def process_user_message(request: APIRequest, user: UserData) -> APIRespon
     # Build response (works with or without context)
     marshee_response = await build_response(request.user_message, user, context)
     
-    # Save chat
+    # Add message to Redis for tracking and potential summary
+    try:
+        await redis_service.add_message(
+            user_id=request.firestore_id,
+            user_message=request.user_message,
+            marshee_response=marshee_response
+        )
+        
+        # Get current message count for display
+        message_count = redis_service.get_current_message_count(request.firestore_id)
+        logger.info(f"User {request.firestore_id} has {message_count} messages in current session")
+        
+    except Exception as e:
+        logger.warning(f"Redis tracking failed: {e}")
+    
+    # Save chat to MongoDB (for permanent record)
     await user_service.save_chat(ChatMessage(
         firestore_id=request.firestore_id,
         stage_id="main_conversation",
@@ -87,6 +103,8 @@ async def build_response(user_message: str, user: UserData, context: dict) -> st
             response += f"I found some product recommendations for {pet_name}. "
         elif any("grooming" in key for key in context.keys()):
             response += f"Here's what I know about grooming {pet_name}. "
+        elif any("user_summary" in key for key in context.keys()):
+            response += f"Based on our previous conversations about {pet_name}, "
         
         response += "What specific information would you like?"
     else:

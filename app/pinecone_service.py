@@ -233,6 +233,40 @@ class PineconeService:
         
         return chunks
     
+    async def save_chat_summary(self, user_id: str, summary: str, chat_history: List[Dict]):
+        """Save chat summary to user_summary namespace"""
+        try:
+            if not self.initialized or not self.index:
+                logger.info("Pinecone not available - skipping summary save")
+                return
+            
+            # Get embedding for summary
+            embedding = self.get_embedding(summary)
+            
+            # Create unique ID for this summary
+            summary_id = f"summary_{user_id}_{int(time.time())}"
+            
+            # Save to Pinecone user_summary namespace
+            self.index.upsert(
+                vectors=[{
+                    "id": summary_id,
+                    "values": embedding,
+                    "metadata": {
+                        "text": summary,
+                        "user_id": user_id,
+                        "type": "chat_summary",
+                        "message_count": len(chat_history),
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                }],
+                namespace="user_summary"
+            )
+            
+            logger.info(f"Saved chat summary to Pinecone for user {user_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save chat summary: {e}")
+    
     def is_ready(self) -> bool:
         """Check if Pinecone service is ready"""
         return self.initialized and self.index is not None
