@@ -44,7 +44,7 @@ async def marshee_interaction(request: APIRequest):
             
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
         import traceback
         error_details = traceback.format_exc()
         print(f"Error in API: {e}")
