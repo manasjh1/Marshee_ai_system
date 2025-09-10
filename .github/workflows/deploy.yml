@@ -1,4 +1,4 @@
-name: Deploy to Google Compute Engine
+name: Deploy to GCE via SSH
 
 on:
   push:
@@ -9,26 +9,62 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.6
+      - name: Deploy to GCE and Restart Service
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.GCE_HOST }}
           username: ${{ secrets.GCE_USERNAME }}
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
-            # Navigate to the application directory on the GCE instance
-            cd /path/to/your/app
+            # Define variables
+            APP_DIR="/home/${{ secrets.GCE_USERNAME }}/Marshee_ai_system"
+            SERVICE_NAME="marshee-ai-system"
+            REPO_URL="https://github.com/${{ github.repository }}.git"
             
-            # Pull the latest code from the main branch
-            git pull origin main
+            # Clone repo only if it doesn't exist
+            if [ ! -d "$APP_DIR" ]; then
+              echo "Repository not found. Cloning from GitHub..."
+              git clone $REPO_URL $APP_DIR
+              cd $APP_DIR
+              
+              # Set up Python virtual environment and install dependencies (only on first clone)
+              /usr/bin/python3 -m venv venv
+              source venv/bin/activate
+              pip install -r requirements.txt
+            else
+              echo "Repository exists. Pulling latest changes..."
+              cd $APP_DIR
+              git pull origin main
+              
+              # Activate existing virtual environment and update dependencies if needed
+              source venv/bin/activate
+              pip install -r requirements.txt --upgrade
+            fi
             
-            # Install new dependencies (if any)
-            # This assumes Python and pip are already installed on the VM
-            pip install -r requirements.txt
+            # Create systemd service file if it doesn't exist
+            SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+            if [ ! -f "$SERVICE_FILE" ]; then
+              echo "Creating systemd service file..."
+              sudo tee $SERVICE_FILE > /dev/null <<EOF
+            [Unit]
+            Description=Marshee AI System
+            After=network.target
+
+            [Service]
+            User=${{ secrets.GCE_USERNAME }}
+            Group=www-data
+            WorkingDirectory=$APP_DIR
+            ExecStart=$APP_DIR/venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+            Restart=always
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+              sudo systemctl daemon-reload
+              sudo systemctl enable ${SERVICE_NAME}.service
+            fi
             
-            # Restart the application
-            # This assumes you are using a process manager like systemd
-            sudo systemctl restart your-fastapi-service
+            # Restart the service
+            sudo systemctl restart ${SERVICE_NAME}.service
+            
+            echo "Deployment successful."
