@@ -106,7 +106,7 @@ async def complete_setup(request: APIRequest, update_data: dict) -> APIResponse:
     await user_service.complete_user_setup(request.firestore_id)
     
     # Save to Pinecone
-    await pinecone_service.save_user_data(request.firestore_id, updated_user.model_dump())
+    await pinecone_service.save_user_profile(request.firestore_id, updated_user.model_dump())
     
     # Create completion response
     marshee_response = (

@@ -4,6 +4,7 @@ from app.services import user_service
 from app.pinecone_service import pinecone_service
 from app.redis_service import redis_service
 from app.groq_service import groq_service
+import random # Added random module
 
 async def handle_conversation(request: APIRequest, user: UserData) -> APIResponse:
     if request.user_message:
@@ -52,7 +53,14 @@ async def process_user_message(request: APIRequest, user: UserData) -> APIRespon
     )
 
 async def welcome_back_user(user: UserData) -> APIResponse:
-    marshee_response = f"Welcome back, {user.user_name}! How are you and {user.pet_name} doing today?"
+    greetings = [
+        f"Hey, {user.user_name}! It's great to see you again. What's new with {user.pet_name}?",
+        f"Welcome back, {user.user_name}! How are you and {user.pet_name} doing today?",
+        f"Glad you're back, {user.user_name}! What can I help you with for {user.pet_name}?",
+        f"Hi, {user.user_name}! Let's talk pets. How can I help you and {user.pet_name}?"
+    ]
+    
+    marshee_response = random.choice(greetings)
     
     return APIResponse(
         success=True,

@@ -1,4 +1,3 @@
-# app/pinecone_service.py - Fixed to read API key correctly and setup namespaces
 import os
 from typing import Dict, List
 from datetime import datetime
@@ -6,6 +5,7 @@ from pinecone import Pinecone
 from app.config import settings
 import structlog
 import time
+import asyncio
 
 logger = structlog.get_logger()
 
@@ -50,9 +50,10 @@ class PineconeService:
                     metric='cosine',
                     spec={'serverless': {'cloud': 'aws', 'region': 'us-east-1'}}
                 )
-                # Wait for index to be ready
+                # Wait for index to be ready using a non-blocking loop
                 logger.info("Waiting for index to be ready...")
-                time.sleep(15)
+                while not self.pc.describe_index(index_name).status['ready']:
+                    await asyncio.sleep(1) # Asynchronously wait
             
             self.index = self.pc.Index(index_name)
             

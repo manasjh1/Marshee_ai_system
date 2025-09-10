@@ -1,8 +1,9 @@
-# app/groq_service.py - Minimal Groq service
+# app/groq_service.py
 import os
 from groq import Groq
 from typing import Dict, List
 import structlog
+from app.prompts import prompts
 
 logger = structlog.get_logger()
 
@@ -36,7 +37,8 @@ class GroqService:
             return self._fallback_response(user_message, user_data)
         
         try:
-            system_prompt = self._build_system_prompt(user_data, redis_chat, vector_context)
+            # Use the new prompts class to build the system prompt
+            system_prompt = prompts.build_system_prompt(user_data, redis_chat, vector_context)
             messages = [{"role": "system", "content": system_prompt}]
             
             # Add recent chat (last 6 messages)
@@ -51,7 +53,7 @@ class GroqService:
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=100,
+                max_tokens=200,
                 stream=False
             )
             
@@ -60,38 +62,6 @@ class GroqService:
         except Exception as e:
             logger.error("Groq generation failed", error=str(e))
             return self._fallback_response(user_message, user_data)
-    
-    def _build_system_prompt(self, user_data: Dict, redis_chat: List[Dict], vector_context: Dict) -> str:
-        user_name = user_data.get('user_name', 'there')
-        pet_name = user_data.get('pet_name', 'your pet')
-        pet_type = user_data.get('pet_type', 'pet')
-        pet_breed = user_data.get('pet_breed', '')
-        pet_age = user_data.get('pet_age', '')
-        
-        prompt = f"""You are Marshee, a pet care assistant helping {user_name} with {pet_name} ({pet_type}, {pet_breed}, {pet_age} years).
-
-PET PROFILE:
-{pet_name} - {pet_type} - {pet_breed} - {pet_age} years"""
-        
-        # Add user history context
-        if vector_context.get('user_history'):
-            prompt += "\n\nPREVIOUS CONVERSATIONS:\n"
-            for result in vector_context['user_history'][:2]:
-                prompt += f"- {result['text'][:200]}...\n"
-        
-        # Add knowledge base context
-        for namespace in ['health_data', 'product_data', 'grooming_data', 'company_data']:
-            if vector_context.get(namespace):
-                prompt += f"\n{namespace.upper()}:\n"
-                for result in vector_context[namespace][:2]:
-                    prompt += f"- {result['text'][:150]}...\n"
-        
-        prompt += f"""
-Current session: {len(redis_chat)} messages
-
-Be friendly, helpful, and reference {pet_name} by name. Give practical advice. For health concerns, recommend veterinary consultation. Keep responses 2-4 sentences."""
-        
-        return prompt
     
     def _fallback_response(self, user_message: str, user_data: Dict) -> str:
         pet_name = user_data.get('pet_name', 'your pet')
