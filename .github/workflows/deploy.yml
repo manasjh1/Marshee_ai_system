@@ -21,50 +21,56 @@ jobs:
             SERVICE_NAME="marshee-ai-system"
             REPO_URL="https://github.com/${{ github.repository }}.git"
             
-            # Clone repo only if it doesn't exist
+            # Clone repo if it doesn't exist, otherwise pull latest changes
             if [ ! -d "$APP_DIR" ]; then
               echo "Repository not found. Cloning from GitHub..."
-              git clone $REPO_URL $APP_DIR
-              cd $APP_DIR
-              
-              # Set up Python virtual environment and install dependencies (only on first clone)
-              /usr/bin/python3 -m venv venv
-              source venv/bin/activate
-              pip install -r requirements.txt
+              git clone "$REPO_URL" "$APP_DIR"
             else
               echo "Repository exists. Pulling latest changes..."
-              cd $APP_DIR
+              cd "$APP_DIR"
               git pull origin main
-              
-              # Activate existing virtual environment and update dependencies if needed
-              source venv/bin/activate
-              pip install -r requirements.txt --upgrade
             fi
+            
+            # Navigate to app directory
+            cd "$APP_DIR"
+            
+            # Create or update the .env file with secrets from GitHub
+            echo "Creating/updating .env file..."
+            cat > .env << 'EOF'
+            mongodb_url="${{ secrets.MONGODB_URL }}"
+            EOF
+            
+            # Set up or update Python virtual environment
+            echo "Setting up Python virtual environment and installing dependencies..."
+            /usr/bin/python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt --upgrade
             
             # Create systemd service file if it doesn't exist
             SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
             if [ ! -f "$SERVICE_FILE" ]; then
               echo "Creating systemd service file..."
-              sudo tee $SERVICE_FILE > /dev/null <<EOF
+              sudo tee "$SERVICE_FILE" > /dev/null << 'EOF'
             [Unit]
             Description=Marshee AI System
             After=network.target
-
+            
             [Service]
             User=${{ secrets.GCE_USERNAME }}
             Group=www-data
             WorkingDirectory=$APP_DIR
             ExecStart=$APP_DIR/venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
             Restart=always
-
+            
             [Install]
             WantedBy=multi-user.target
             EOF
               sudo systemctl daemon-reload
-              sudo systemctl enable ${SERVICE_NAME}.service
+              sudo systemctl enable "${SERVICE_NAME}.service"
             fi
             
-            # Restart the service
-            sudo systemctl restart ${SERVICE_NAME}.service
+            # Restart the service to apply changes
+            echo "Restarting service..."
+            sudo systemctl restart "${SERVICE_NAME}.service"
             
             echo "Deployment successful."
