@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     database_name: str = "marshee_ai"
     environment: str = "development"
     
-    # Pinecone settings - with fallback to env vars
+    # Pinecone - with fallback to env vars
     pinecone_api_key: str = os.getenv("PINECONE_API_KEY", "")
     pinecone_index_name: str = "marshee-ai"
     
