@@ -7,7 +7,6 @@ load_dotenv()
 
 class Settings(BaseSettings):
     model_config = ConfigDict(env_file=".env", extra='allow')
-    # MongoDB settings
     mongodb_url: str
     database_name: str = "marshee_ai"
     environment: str = "development"
