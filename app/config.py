@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from dotenv import load_dotenv
 
-# Force load .env file
 load_dotenv()
 
 class Settings(BaseSettings):
